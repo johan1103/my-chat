@@ -1,0 +1,57 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+
+    // Netty Core Dependencies
+    implementation 'io.netty:netty-all:4.1.96.Final'
+
+    // SLF4J for Logging
+    implementation 'org.slf4j:slf4j-api:2.0.7'
+    runtimeOnly 'org.slf4j:slf4j-simple:2.0.7' // 콘솔 로깅용 SLF4J 구현체
+
+    // Optional: JSON Support (For Future Features)
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.15.2'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.2'
+
+    // Optional: Test Dependencies
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+}
+
+tasks.named('jar') {
+    manifest {
+        attributes(
+                'Main-Class': 'org.example.WebSocketChatServer' // 메인 클래스의 경로를 지정
+        )
+    }
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.named('shadowJar') {
+    manifest {
+        attributes(
+                'Main-Class': 'org.example.WebSocketChatServer' // 메인 클래스
+        )
+    }
+}
