@@ -34,9 +34,11 @@ public class WebSocketChatServer {
 
         // 연결 종료 시 특정 로직 실행
         inbound.receiveCloseStatus()
-                .flatMap(status ->
-                        broadcastMessage(MessagePrefix.STRING.getType()+clientId+"left the chat", clientId)
-                                .then())
+                .flatMap(status ->{
+                        clients.remove(clientId);
+                        return broadcastMessage(MessagePrefix.STRING.getType()+clientId+"left the chat", clientId)
+                                .then();
+                })
                 .subscribe(); // 스트림을 구독하여 종료 상태 감지
 
         return inbound.receive().asString()
