@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 import reactor.netty.http.websocket.WebsocketInbound;
@@ -36,14 +37,13 @@ public class WebSocketChatServer {
         inbound.receiveCloseStatus()
                 .flatMap(status ->{
                         clients.remove(clientId);
-                        return broadcastMessage(MessagePrefix.STRING.getType()+clientId+"left the chat", clientId)
+                        return broadcastMessage(MessagePrefix.STRING.getType()+clientId+" has left the chat", clientId)
                                 .then();
-                })
+                }).subscribeOn(Schedulers.boundedElastic())
                 .subscribe(); // 스트림을 구독하여 종료 상태 감지
 
         return inbound.receive().asString()
-                .flatMap(message -> processMessage(clientId, message))
-                .flatMap(signalType -> broadcastMessage(MessagePrefix.STRING.getType()+clientId + " has left the chat", clientId));
+                .flatMap(message -> processMessage(clientId, message));
     }
 
     private static Flux<Void> processMessage(String senderId, String jsonMessage) {
