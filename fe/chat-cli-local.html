@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Responsive Chat</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background-color: #f9f9f9;
+    }
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      margin: 0;
+      border-bottom: 1px solid #ccc;
+      display: flex;
+      flex-direction: column; /* 메시지들이 아래로 쌓이도록 설정 */
+    }
+    #input-container {
+      display: flex;
+      padding: 10px;
+      background-color: #ffffff;
+      border-top: 1px solid #ccc;
+      box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+    }
+    #input-container input {
+      flex: 1;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 16px;
+      outline: none;
+    }
+    #input-container input:focus {
+      border-color: #007bff;
+    }
+    #input-container button {
+      padding: 15px;
+      margin-left: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      outline: none;
+      transition: background-color 0.2s ease-in-out;
+    }
+    #input-container button:hover {
+      background-color: #0056b3;
+    }
+    .message {
+      margin: 5px 0;
+      padding: 10px;
+      border-radius: 8px;
+      display: inline-block; /* 메시지의 너비를 내용 길이에 맞춤 */
+      word-wrap: break-word;
+      max-width: 80%; /* 너무 길지 않도록 최대 너비 제한 */
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .message.server {
+      background-color: #e9ecef;
+      color: #495057;
+      align-self: flex-start; /* 서버 메시지는 왼쪽 정렬 */
+    }
+    .message.user {
+      background-color: #007bff;
+      color: white;
+      align-self: flex-end; /* 사용자 메시지는 오른쪽 정렬 */
+    }
+    .user-id {
+      font-size: 12px;
+      color: #6c757d;
+      margin-bottom: 5px;
+    }
+    .message-text {
+      font-size: 16px;
+    }
+    .message.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div id="chat"></div>
+  <div id="input-container">
+    <input id="message" type="text" placeholder="Type your message..." />
+    <button id="send">Send</button>
+  </div>
+
+  <script>
+    const socket = new WebSocket("ws://127.0.0.1:9000/chat");
+    const chatDiv = document.getElementById("chat");
+    const messageInput = document.getElementById("message");
+    const sendButton = document.getElementById("send");
+
+    // 클라이언트에서 랜덤 userId 생성
+    const userId = `user_${Math.random().toString(36).substr(2, 9)}`;
+
+    // 메시지 추가 함수
+    const appendMessage = (text, type, userId = null) => {
+      const messageElement = document.createElement("div");
+      messageElement.classList.add("message", type);
+
+      // userId 표시
+      if (userId) {
+        const userIdElement = document.createElement("div");
+        userIdElement.classList.add("user-id");
+        userIdElement.textContent = userId;
+        messageElement.appendChild(userIdElement);
+      }
+
+      // 메시지 텍스트 표시
+      const messageTextElement = document.createElement("div");
+      messageTextElement.classList.add("message-text");
+      messageTextElement.textContent = text;
+      messageElement.appendChild(messageTextElement);
+
+      chatDiv.appendChild(messageElement);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+
+      setTimeout(() => {
+        messageElement.classList.add("show");
+      }, 50);
+    };
+
+    // 서버로부터 메시지 수신
+    socket.onmessage = (event) => {
+      const rawData = event.data;
+
+      // "server_message:" prefix 제거 및 JSON 파싱
+      if (rawData.startsWith("server_message:")) {
+        const jsonString = rawData.replace("server_message:", "").trim();
+        try {
+          const data = JSON.parse(jsonString);
+          if (data && data.text) {
+            appendMessage(data.text, "server", data.userId);
+          } else {
+            console.warn("Invalid message format", jsonString);
+          }
+        } catch (error) {
+          console.error("Error parsing server message", error);
+        }
+      } else if (rawData.startsWith("string:")) {
+          // "string:" prefix 제거하고 메시지 출력
+          const message = rawData.replace("string:", "").trim();
+          appendMessage(message, "server"); // userId는 표시하지 않음
+      } else {
+          console.warn("Unknown message format:", rawData);
+      }
+    };
+
+    // 메시지 전송
+    const sendMessage = () => {
+      const message = messageInput.value.trim();
+      if (message !== "") {
+        const jsonMessage = JSON.stringify({ userId, text: message });
+        socket.send(jsonMessage);
+        appendMessage(message, "user");
+        messageInput.value = "";
+      }
+    };
+
+    // Send 버튼 클릭 이벤트
+    sendButton.addEventListener("click", sendMessage);
+
+    // Enter 키로 메시지 전송
+    messageInput.addEventListener("keyup", (event) => {
+      if (event.key === "Enter" && !event.isComposing) {
+        sendMessage();
+      }
+    });
+
+    // WebSocket 연결 종료 시
+    socket.onclose = () => {
+      appendMessage("Disconnected from server.", "server");
+    };
+
+    // WebSocket 오류 발생 시
+    socket.onerror = (error) => {
+      console.error("WebSocket Error:", error);
+    };
+  </script>
+</body>
+</html>
